@@ -24,7 +24,7 @@ export function useVerifyPhoneFlow(): {
   resending: boolean;
   resendCooldownSeconds: number;
 } {
-  const { next, back } = useCashDepositSetupNavigation();
+  const { next } = useCashDepositSetupNavigation();
   const state = useVerifyPhoneFlowStore(s => s.state);
   const code = useVerifyPhoneFlowStore(s => s.code);
   const kycOutcome = useVerifyPhoneFlowStore(s => s.kycOutcome);
@@ -35,8 +35,15 @@ export function useVerifyPhoneFlow(): {
   const submit = useCallback(async () => {
     const result = await verifyPhoneFlowActions.submit();
     if (result === 'verified') next();
-    if (result === 'signupAlreadyComplete') back();
-  }, [back, next]);
+    if (result === 'recoveryCodeAccepted') {
+      const { session } = useCashSetupSessionStore.getState();
+      if (session.status === 'recovery' && session.identity && session.governmentId) {
+        CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_REVIEW);
+      } else {
+        next();
+      }
+    }
+  }, [next]);
 
   const continueAfterKyc = useCallback(() => {
     CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_PASSKEY);

@@ -10,6 +10,7 @@ import {
   getUserStatus,
   KycStatus,
   resendPhoneCode,
+  startRecovery,
   startSignupResume,
   verifyPhone,
   type KycOutcome,
@@ -18,9 +19,9 @@ import { useCashSetupSessionStore, type PhoneChallenge } from './cashSetupSessio
 
 export const OTP_LENGTH = 6;
 
-export type VerifyPhoneState = 'entry' | 'verifying' | 'verified' | 'error';
+export type VerifyPhoneState = 'entry' | 'verifying' | 'submitted' | 'error';
 
-export type VerifyPhoneResult = 'verified' | 'verifiedKycOutcome' | 'failed' | 'signupAlreadyComplete';
+export type VerifyPhoneResult = 'verified' | 'verifiedKycOutcome' | 'failed' | 'recoveryCodeAccepted' | 'recoveryStarted';
 
 // Null means the wizard proceeds to the KYC steps: either nothing was ever
 // submitted, or the status could not be read and a redundant pass is the safe
@@ -56,6 +57,7 @@ type VerifyPhoneFlowStore = {
   setCode: (code: string) => void;
   submit: () => Promise<VerifyPhoneResult>;
   resend: () => Promise<void>;
+  rejectCode: () => void;
   clearKycOutcome: () => void;
   reset: () => void;
 };
@@ -70,10 +72,15 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
 
   submit: async () => {
     const { code, state } = get();
-    if (code.length !== OTP_LENGTH || state === 'verifying' || state === 'verified') return 'failed';
+    if (code.length !== OTP_LENGTH || state === 'verifying' || state === 'submitted') return 'failed';
     const sessionStore = useCashSetupSessionStore.getState();
     const { session } = sessionStore;
-    if (session.status !== 'phoneSubmitted') return 'failed';
+    if (session.status !== 'phoneSubmitted' && session.status !== 'recovery') return 'failed';
+
+    if (session.status === 'recovery') {
+      set({ state: 'submitted' });
+      return 'recoveryCodeAccepted';
+    }
     const { challenge } = session;
 
     set({ state: 'verifying' });
@@ -88,10 +95,19 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
       }
 
       if (result.outcome === 'signupAlreadyComplete') {
-        analytics.track(analytics.event.cashPhoneAlreadyRegistered, { outcome: 'signupAlreadyComplete' });
-        sessionStore.setPhoneAlreadyRegistered(session.phoneNationalNumber);
+        const { recoveryId, resendAfter } = await startRecovery({ nationalNumber: session.phoneNationalNumber });
+        if (!sessionStore.getIsCurrentChallenge(challenge)) {
+          set(state => (state.state === 'verifying' ? { code: '', state: 'entry' } : state));
+          return 'failed';
+        }
+        sessionStore.setPhoneSubmitted({
+          challenge: { kind: 'recovery', recoveryId },
+          phoneNationalNumber: session.phoneNationalNumber,
+          resendAfter,
+        });
+        analytics.track(analytics.event.cashPhoneSubmitted, { mode: 'recovery' });
         set({ code: '', state: 'entry' });
-        return 'signupAlreadyComplete';
+        return 'recoveryStarted';
       }
 
       sessionStore.setPhoneVerified(challenge, { bootstrapToken: result.bootstrapToken, expiresAt: result.expiresAt });
@@ -104,7 +120,7 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
       // Terminal, and deliberately not 'verifying': Setup's submission lock reads
       // that state, so lingering there would disable every exit for the rest of
       // the flow. Screen cleanup or a fresh phone submission resets the store.
-      set({ kycOutcome, state: 'verified' });
+      set({ kycOutcome, state: 'submitted' });
       return kycOutcome ? 'verifiedKycOutcome' : 'verified';
     } catch (e) {
       if (!sessionStore.getIsCurrentChallenge(challenge)) {
@@ -125,7 +141,7 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
     if (get().resending !== null) return;
     const sessionStore = useCashSetupSessionStore.getState();
     const { session } = sessionStore;
-    if (session.status !== 'phoneSubmitted' || Date.now() < session.resendAfter) return;
+    if ((session.status !== 'phoneSubmitted' && session.status !== 'recovery') || Date.now() < session.resendAfter) return;
     const { challenge, phoneNationalNumber } = session;
 
     set(({ state }) => ({ resending: challenge, state: state === 'error' ? 'entry' : state }));
@@ -133,12 +149,16 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
       if (challenge.kind === 'signup') {
         const { resendAfter } = await resendPhoneCode({ userId: challenge.userId });
         sessionStore.setResendAfter(challenge, resendAfter);
-      } else {
+      } else if (challenge.kind === 'resume') {
         // Resume has no resend endpoint; re-arming the OTP means a fresh
         // StartSignupResume, whose resumeId replaces the current challenge.
         const { resumeId, resendAfter } = await startSignupResume({ nationalNumber: phoneNationalNumber });
         if (!sessionStore.getIsCurrentChallenge(challenge)) return;
         sessionStore.setPhoneSubmitted({ challenge: { kind: 'resume', resumeId }, phoneNationalNumber, resendAfter });
+      } else {
+        const { recoveryId, resendAfter } = await startRecovery({ nationalNumber: phoneNationalNumber });
+        if (!sessionStore.getIsCurrentChallenge(challenge)) return;
+        sessionStore.replaceRecoveryChallenge(challenge, { kind: 'recovery', recoveryId }, resendAfter);
       }
     } catch (e) {
       if (!sessionStore.getIsCurrentChallenge(challenge)) return;
@@ -147,6 +167,8 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
       set(state => (state.resending === challenge ? { resending: null } : state));
     }
   },
+
+  rejectCode: () => set({ code: '', state: 'error' }),
 
   // Narrower than reset() on purpose: the step stays mounted behind the pager, so
   // restoring 'entry' would re-enable its OTP input and flash the keyboard.

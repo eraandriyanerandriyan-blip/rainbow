@@ -554,17 +554,17 @@ export type EventProperties = {
     errorCode: 'PAYMENT_REJECTED' | 'GENERIC';
   };
   [event.cashPhoneSubmitted]: {
-    mode: 'signup' | 'resume';
+    mode: 'signup' | 'resume' | 'recovery';
   };
   [event.cashPhoneAlreadyRegistered]: {
-    outcome: 'registeredWithPasskey' | 'alreadyRegistered' | 'signupAlreadyComplete';
+    outcome: 'alreadyRegistered';
   };
   [event.cashPhoneVerified]: {
-    mode: 'signup' | 'resume';
+    mode: 'signup' | 'resume' | 'recovery';
   };
   [event.cashPhoneVerifyFailed]: {
     reason: string;
-    mode: 'signup' | 'resume';
+    mode: 'signup' | 'resume' | 'recovery';
   };
   [event.cashKycSubmitted]: undefined;
   [event.cashKycApproved]: undefined;

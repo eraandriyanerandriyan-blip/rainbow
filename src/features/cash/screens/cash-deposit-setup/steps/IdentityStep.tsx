@@ -7,7 +7,7 @@ import { useDatePicker } from '@/framework/ui/hooks/useDatePicker';
 import * as i18n from '@/languages';
 
 import { formatDateOfBirth, isValidDateOfBirth, isValidLegalName, toDate, toDateOfBirth } from '../../../services/cashSetupIdentityService';
-import { useCashSetupSessionStore, type CashSetupDateOfBirth } from '../../../stores/cashSetupSessionStore';
+import { selectCashSetupIdentity, useCashSetupSessionStore, type CashSetupDateOfBirth } from '../../../stores/cashSetupSessionStore';
 import { SetupStepLayout } from '../components/SetupStepLayout';
 import { useCashDepositSetupNavigation } from '../useCashDepositSetupNavigation';
 
@@ -27,7 +27,7 @@ function getInitialDateOfBirth(maximumDate: Date): Date {
 }
 
 export const IdentityStep = memo(function IdentityStep() {
-  const storedIdentity = useCashSetupSessionStore(state => (state.session.status === 'phoneVerified' ? state.session.identity : null));
+  const storedIdentity = useCashSetupSessionStore(selectCashSetupIdentity);
   const [firstName, setFirstName] = useState(storedIdentity?.firstName ?? '');
   const [lastName, setLastName] = useState(storedIdentity?.lastName ?? '');
   const [maximumDateOfBirth] = useState(getMaximumDateOfBirth);

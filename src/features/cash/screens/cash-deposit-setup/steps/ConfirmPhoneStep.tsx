@@ -19,7 +19,7 @@ export const ConfirmPhoneStep = memo(function ConfirmPhoneStep() {
   // The pager keeps visited steps mounted, so focus is tied to the step being active rather than to mount.
   const isActiveStep = useCashDepositSetupNavigationStore(s => s.activeRoute === Routes.CASH_SETUP_CONFIRM_PHONE);
   // Stays true once the code is accepted: re-enabling the kept-mounted input would refocus it and flash the keyboard.
-  const submitted = state === 'verifying' || state === 'verified';
+  const submitted = state === 'verifying' || state === 'submitted';
   const cooling = resendCooldownSeconds > 0;
 
   return (

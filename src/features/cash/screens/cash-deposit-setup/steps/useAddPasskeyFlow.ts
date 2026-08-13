@@ -6,14 +6,16 @@ import { analytics } from '@/analytics';
 import { logger, RainbowError } from '@/logger';
 
 import { createPasskeyCredential, getPasskeyName, isPasskeyCancellation } from '../../../services/cashPasskeyService';
+import { listCards } from '../../../services/rampClient';
 import { addPasskey, finishAddPasskey } from '../../../services/userClient';
 import { useCashAccountStore } from '../../../stores/cashAccountStore';
+import { useCashPaymentMethodStore } from '../../../stores/cashPaymentMethodStore';
 import { useCashSetupSessionStore } from '../../../stores/cashSetupSessionStore';
 import { useCashDepositSetupNavigation } from '../useCashDepositSetupNavigation';
 
 export type AddPasskeyState = 'entry' | 'submitting' | 'error';
 
-export type AddPasskeyResult = 'completed' | 'cancelled' | 'failed' | 'skipped';
+export type AddPasskeyResult = 'completed' | 'recovered' | 'cancelled' | 'failed' | 'skipped';
 
 type AddPasskeyFlowStore = {
   state: AddPasskeyState;
@@ -30,6 +32,7 @@ export const useAddPasskeyFlowStore = createBaseStore<AddPasskeyFlowStore>((set,
     if (get().state === 'submitting') return 'skipped';
     const { session } = useCashSetupSessionStore.getState();
     if (session.status !== 'phoneVerified') return 'skipped';
+    const recovering = session.source === 'recovery';
 
     set({ state: 'submitting' });
     analytics.track(analytics.event.cashPasskeySubmitted);
@@ -41,8 +44,20 @@ export const useAddPasskeyFlowStore = createBaseStore<AddPasskeyFlowStore>((set,
 
       useCashAccountStore.getState().setUserId(userId);
       analytics.track(analytics.event.cashPasskeyAdded);
+
+      if (recovering) {
+        try {
+          const [card] = await listCards({ trigger: 'recovery' });
+          if (card) useCashPaymentMethodStore.getState().setLinkedCard(card);
+        } catch (error) {
+          if (!isPasskeyCancellation(error)) {
+            logger.error(new RainbowError('[useAddPasskeyFlow]: Failed to restore recovered account', error));
+          }
+        }
+      }
+
       set({ state: 'entry' });
-      return 'completed';
+      return recovering ? 'recovered' : 'completed';
     } catch (e) {
       if (isPasskeyCancellation(e)) {
         set({ state: 'entry' });
@@ -63,12 +78,14 @@ export function useAddPasskeyFlow(): {
   state: AddPasskeyState;
   submit: () => Promise<void>;
 } {
-  const { next } = useCashDepositSetupNavigation();
+  const { complete, next } = useCashDepositSetupNavigation();
   const state = useAddPasskeyFlowStore(state => state.state);
 
   const submit = useCallback(async () => {
-    if ((await addPasskeyFlowActions.submit()) === 'completed') next();
-  }, [next]);
+    const result = await addPasskeyFlowActions.submit();
+    if (result === 'completed') next();
+    if (result === 'recovered') complete();
+  }, [complete, next]);
 
   return { reset: addPasskeyFlowActions.reset, state, submit };
 }

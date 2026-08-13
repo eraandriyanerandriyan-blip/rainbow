@@ -6,16 +6,14 @@ import { useSetupInputTextStyle } from '@/features/cash/components/useSetupInput
 import * as i18n from '@/languages';
 
 import { createUsSsnLast4GovernmentId, isValidUsSsnLast4 } from '../../../services/cashSetupIdentityService';
-import { useCashSetupSessionStore } from '../../../stores/cashSetupSessionStore';
+import { selectCashSetupGovernmentId, useCashSetupSessionStore } from '../../../stores/cashSetupSessionStore';
 import { SetupStepLayout } from '../components/SetupStepLayout';
 import { useCashDepositSetupNavigation } from '../useCashDepositSetupNavigation';
 
 const l = i18n.l.cash.deposit_setup.ssn;
 
 export const SsnStep = memo(function SsnStep() {
-  const storedLast4 = useCashSetupSessionStore(state =>
-    state.session.status === 'phoneVerified' ? (state.session.governmentId?.value ?? '') : ''
-  );
+  const storedLast4 = useCashSetupSessionStore(state => selectCashSetupGovernmentId(state)?.value ?? '');
   const [digits, setDigits] = useState(storedLast4);
   const inputRef = useRef<TextInput>(null);
   const inputTextStyle = useSetupInputTextStyle();

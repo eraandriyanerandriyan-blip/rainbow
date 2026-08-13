@@ -5,17 +5,20 @@ import { Box, Separator, Text } from '@/design-system';
 import { CashStatusHalfSheet } from '@/features/cash/components/CashStatusHalfSheet';
 import * as i18n from '@/languages';
 import Routes from '@/navigation/routesNames';
+import { RAINBOW_SUPPORT_URL } from '@/references/constants';
+import { openInBrowser } from '@/utils/openInBrowser';
 
 import { formatDateOfBirth, formatUsSsnMasked } from '../../../services/cashSetupIdentityService';
-import { useCashSetupSessionStore } from '../../../stores/cashSetupSessionStore';
+import { selectCashSetupGovernmentId, selectCashSetupIdentity, useCashSetupSessionStore } from '../../../stores/cashSetupSessionStore';
 import { CashDepositSetupNavigation } from '../cashDepositSetupNavigator';
 import { KycOutcomeSheet } from '../components/KycOutcomeSheet';
 import { SetupStepLayout } from '../components/SetupStepLayout';
 import { useCashDepositSetupNavigation } from '../useCashDepositSetupNavigation';
-import { useSubmitKycFlow } from './useSubmitKycFlow';
+import { useSubmitReviewFlow } from './useSubmitReviewFlow';
 
 const l = i18n.l.cash.deposit_setup.review;
 const kycL = i18n.l.cash.deposit_setup.kyc;
+const recoveryLockedL = i18n.l.cash.deposit_setup.recovery_locked;
 
 function ReviewRow({
   disabled,
@@ -52,14 +55,23 @@ function ReviewRow({
 }
 
 export const ReviewStep = memo(function ReviewStep() {
-  const identity = useCashSetupSessionStore(state => (state.session.status === 'phoneVerified' ? state.session.identity : null));
-  const governmentId = useCashSetupSessionStore(state => (state.session.status === 'phoneVerified' ? state.session.governmentId : null));
-  const { next } = useCashDepositSetupNavigation();
-  const { reset, state, submit } = useSubmitKycFlow();
+  const identity = useCashSetupSessionStore(selectCashSetupIdentity);
+  const governmentId = useCashSetupSessionStore(selectCashSetupGovernmentId);
+  const { dismiss, next } = useCashDepositSetupNavigation();
+  const { reset, state, submit: submitReview } = useSubmitReviewFlow();
   const submitting = state === 'submitting';
 
+  const submit = useCallback(async () => {
+    const result = await submitReview();
+    if (result === 'recovered') CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_PASSKEY);
+    if (result === 'phoneCodeRequired') CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_CONFIRM_PHONE);
+  }, [submitReview]);
   const editIdentity = useCallback(() => CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_IDENTITY), []);
   const editSsn = useCallback(() => CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_SSN), []);
+  const contactSupport = useCallback(() => {
+    openInBrowser(RAINBOW_SUPPORT_URL);
+    dismiss();
+  }, [dismiss]);
   const continueAfterVerification = useCallback(() => {
     reset();
     next();
@@ -115,6 +127,15 @@ export const ReviewStep = memo(function ReviewStep() {
           status="inProgress"
           testID="cash-setup-kyc-verifying"
           title={i18n.t(kycL.verifying_title)}
+        />
+      ) : state === 'locked' ? (
+        <CashStatusHalfSheet
+          description={i18n.t(recoveryLockedL.description)}
+          primaryAction={{ label: i18n.t(kycL.contact_support), onPress: contactSupport, testID: 'cash-setup-recovery-locked-support' }}
+          secondaryAction={{ label: i18n.t(kycL.close), onPress: dismiss, testID: 'cash-setup-recovery-locked-close' }}
+          status="error"
+          testID="cash-setup-recovery-locked"
+          title={i18n.t(recoveryLockedL.title)}
         />
       ) : state === 'error' ? (
         <CashStatusHalfSheet

@@ -12,6 +12,11 @@ import { getNextSetupStep } from './steps';
 export function useCashDepositSetupNavigation() {
   const { navigate, goBack: dismissScreen } = useNavigation();
 
+  const complete = useCallback(() => {
+    dismissScreen();
+    navigate(Routes.ADD_CASH_SHEET);
+  }, [dismissScreen, navigate]);
+
   const next = useCallback(() => {
     const current = CashDepositSetupNavigation.getActiveRoute();
     const upcoming = getNextSetupStep(current);
@@ -20,14 +25,13 @@ export function useCashDepositSetupNavigation() {
       return;
     }
 
-    dismissScreen();
-    navigate(Routes.ADD_CASH_SHEET);
-  }, [dismissScreen, navigate]);
+    complete();
+  }, [complete]);
 
   const cancel = useCallback(() => {
     const hasPasskey = useCashAccountStore.getState().userId != null;
     const { status } = useCashSetupSessionStore.getState().session;
-    const hasProgressToLose = status === 'phoneSubmitted' || status === 'phoneVerified';
+    const hasProgressToLose = status === 'phoneSubmitted' || status === 'recovery' || status === 'phoneVerified';
     if (!hasPasskey && hasProgressToLose) {
       useSetupCancelSheetStore.getState().open();
     } else {
@@ -43,5 +47,5 @@ export function useCashDepositSetupNavigation() {
     }
   }, [cancel]);
 
-  return { next, back, cancel, dismiss: dismissScreen };
+  return { next, back, cancel, complete, dismiss: dismissScreen };
 }
