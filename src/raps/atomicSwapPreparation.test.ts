@@ -1,14 +1,14 @@
 import { StaticJsonRpcProvider } from '@ethersproject/providers';
 
 import { backendNetworksActions } from '@/features/network/stores/backendNetworksStore';
-import { type Call } from '@rainbow-me/sdk';
+import { type CallInput } from '@rainbow-me/sdk';
 import { SwapType, type CrosschainQuote, type Quote } from '@rainbow-me/swaps';
 
 import { prepareCrosschainSwapCall } from './actions/crosschainSwap';
 import { prepareSwapCall } from './actions/swap';
 import { prepareApprovalCall } from './actions/unlock';
 import { resolveApprovalRequirement } from './approval';
-import { buildAtomicExecutionRequirements, prepareAtomicSwapCalls } from './atomicSwapPreparation';
+import { buildAtomicExecutionPolicy, prepareAtomicSwapCalls } from './atomicSwapPreparation';
 
 const mockGetRemoteConfig = jest.fn(() => ({ sponsored_swaps_enabled: true }));
 
@@ -99,7 +99,7 @@ describe('atomicSwapPreparation', () => {
 
   it('builds the same-chain atomic call list without approval when none is required', async () => {
     const quote = buildQuote();
-    const swapCall: Call = {
+    const swapCall: CallInput = {
       data: '0xaaaa',
       to: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       value: 0n,
@@ -126,12 +126,12 @@ describe('atomicSwapPreparation', () => {
 
   it('builds approval before the bridge call when approval is required', async () => {
     const quote = buildCrosschainQuote();
-    const approvalCall: Call = {
+    const approvalCall: CallInput = {
       data: '0xbbbb',
       to: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
       value: 0n,
     };
-    const bridgeCall: Call = {
+    const bridgeCall: CallInput = {
       data: '0xcccc',
       to: '0xcccccccccccccccccccccccccccccccccccccccc',
       value: 5n,
@@ -165,16 +165,15 @@ describe('atomicSwapPreparation', () => {
   });
 
   it('requests sponsor fees only when sponsorship is enabled and eligible', async () => {
-    expect(buildAtomicExecutionRequirements(8453)).toEqual({
-      atomic: 'required',
-      fees: { payer: 'sponsor' },
+    expect(buildAtomicExecutionPolicy(8453)).toEqual({
+      atomic: true,
+      sponsorship: 'required',
     });
 
     mockGetRemoteConfig.mockReturnValue({ sponsored_swaps_enabled: false });
 
-    expect(buildAtomicExecutionRequirements(8453)).toEqual({
-      atomic: 'required',
-      fees: undefined,
+    expect(buildAtomicExecutionPolicy(8453)).toEqual({
+      atomic: true,
     });
   });
 });

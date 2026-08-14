@@ -5,7 +5,7 @@ import { type Address } from 'viem';
 
 import { TransactionStatus, type NewTransaction } from '@/entities/transactions/transaction';
 import { ChainId } from '@/features/network/types/backendNetworks';
-import { type Call, type PreparedCallsExecution } from '@rainbow-me/sdk';
+import { execute, type CallInput, type CallsPolicy } from '@rainbow-me/sdk';
 
 import {
   buildPendingSendTransaction,
@@ -28,10 +28,10 @@ const mockRemoteConfig = {
   sponsored_sends_enabled: true,
 };
 
-const mockSponsoredCallsRequirements = {
-  atomic: 'required',
-  fees: { payer: 'sponsor' },
-};
+const mockSponsoredCallsPolicy = {
+  atomic: true,
+  sponsorship: 'required',
+} satisfies CallsPolicy;
 
 jest.mock('@rainbow-me/sdk', () => ({
   execute: {
@@ -55,9 +55,9 @@ jest.mock('@/features/network/stores/backendNetworksStore', () => ({
 jest.mock('@/features/delegation/utils/calls', () => ({
   createDelegationPublicClient: (chainId: ChainId, options?: { signal?: AbortSignal }) =>
     options ? mockCreateDelegationPublicClient(chainId, options) : mockCreateDelegationPublicClient(chainId),
-  SPONSORED_CALLS_REQUIREMENTS: {
-    atomic: 'required',
-    fees: { payer: 'sponsor' },
+  SPONSORED_CALLS_POLICY: {
+    atomic: true,
+    sponsorship: 'required',
   },
 }));
 
@@ -77,14 +77,13 @@ jest.mock('@/features/delegation/utils/willDelegate', () => ({
 const ACCOUNT = '0x3333333333333333333333333333333333333333' satisfies Address;
 const RECIPIENT = '0x4444444444444444444444444444444444444444' satisfies Address;
 const PRIVATE_KEY = '0x0123456789012345678901234567890123456789012345678901234567890123';
-const TX_HASH = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 const chainId = ChainId.base;
 const provider = new StaticJsonRpcProvider('http://127.0.0.1:8545', chainId);
 const signer = new Wallet(PRIVATE_KEY, provider);
 const publicClient = { name: 'public-client' };
 
-const sendCall: Call = {
+const sendCall: CallInput = {
   data: '0x1234',
   to: RECIPIENT,
   value: 123n,
@@ -107,20 +106,21 @@ const pendingTransaction = {
   value: sendCall.value,
 } satisfies Omit<NewTransaction, 'hash'>;
 
-function executeWith(params?: Partial<Parameters<typeof executeSponsoredSend>[0]>) {
+async function executeWith(params?: Partial<Parameters<typeof executeSponsoredSend>[0]>) {
+  const preparedCalls =
+    params?.preparedCalls === undefined
+      ? await execute.prepare.calls({ ...mockSponsoredCallsPolicy, calls: [sendCall], chainId, provider, signer })
+      : params.preparedCalls;
+
   return executeSponsoredSend({
     accountAddress: ACCOUNT,
     call: sendCall,
     chainId,
-    preparedCalls: {
-      executionId: 'prepared-send',
-      kind: 'calls.managed',
-      review: { fees: { payer: 'sponsor' } },
-    } as PreparedCallsExecution,
     provider,
     signer,
     transaction: pendingTransaction,
     ...params,
+    preparedCalls,
   });
 }
 
@@ -183,7 +183,7 @@ describe('sponsoredSend', () => {
       calls: [sendCall],
       chainId,
       publicClient,
-      requirements: mockSponsoredCallsRequirements,
+      ...mockSponsoredCallsPolicy,
     });
   });
 
@@ -200,7 +200,7 @@ describe('sponsoredSend', () => {
       calls: [sendCall],
       chainId,
       publicClient,
-      requirements: mockSponsoredCallsRequirements,
+      ...mockSponsoredCallsPolicy,
     });
   });
 
@@ -285,29 +285,21 @@ describe('sponsoredSend', () => {
   });
 
   it('executes an unprepared send by building a sponsored exact-call request', async () => {
-    const walletTransaction = {
-      hash: TX_HASH,
-      transaction: {
-        data: sendCall.data,
-        to: sendCall.to,
-        value: sendCall.value,
-      },
-      type: 'eip1559',
+    const managedExecution = {
+      executionId: 'submitted-send',
+      kind: 'calls.managed',
+      status: 'PENDING',
     };
-    const walletExecution = {
-      kind: 'calls.wallet',
-      transactions: [walletTransaction],
-    };
-    mockExecuteCalls.mockResolvedValue(walletExecution);
+    mockExecuteCalls.mockResolvedValue(managedExecution);
 
-    await expect(executeWith({ preparedCalls: null })).resolves.toBe(walletExecution);
+    await expect(executeWith({ preparedCalls: null })).resolves.toBe(managedExecution);
 
     expect(mockExecuteCalls).toHaveBeenCalledWith(
       {
         calls: [sendCall],
         chainId,
         provider,
-        requirements: mockSponsoredCallsRequirements,
+        ...mockSponsoredCallsPolicy,
         signer,
       },
       undefined
@@ -316,7 +308,7 @@ describe('sponsoredSend', () => {
       address: ACCOUNT,
       batch: false,
       chainId,
-      execution: walletTransaction,
+      execution: managedExecution,
       transaction: pendingTransaction,
     });
   });
