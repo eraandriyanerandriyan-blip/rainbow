@@ -1,5 +1,4 @@
-import { IS_TESTING } from 'react-native-dotenv';
-
+import { IS_CASH_MOCK } from '@/env';
 import { RainbowFetchError } from '@/framework/data/http/rainbowFetch';
 
 import { useCashAuthTokenStore } from '../stores/cashAuthTokenStore';
@@ -227,7 +226,7 @@ export async function linkWallet(
 type GetOrderResponse = { order: BuyOrder };
 
 export async function createBuyOrder(params: CreateBuyOrderParams): Promise<CreatedBuyOrder> {
-  if (IS_TESTING === 'true') return e2eCreateBuyOrder(params);
+  if (IS_CASH_MOCK) return e2eCreateBuyOrder(params);
 
   const { data } = await authorizedRequest('addCash', headers =>
     getCashPlatformClient().post<CreatedBuyOrder>('/ramp/orders/buy', params, { headers })
@@ -236,7 +235,7 @@ export async function createBuyOrder(params: CreateBuyOrderParams): Promise<Crea
 }
 
 export async function getOrder(orderId: string, abortController?: AbortController | null): Promise<BuyOrder> {
-  if (IS_TESTING === 'true') return e2eGetOrder(orderId);
+  if (IS_CASH_MOCK) return e2eGetOrder(orderId);
 
   const { data } = await authorizedRequest('addCash', headers =>
     getCashPlatformClient().get<GetOrderResponse>(`/ramp/orders/${encodeURIComponent(orderId)}`, { abortController, headers })
