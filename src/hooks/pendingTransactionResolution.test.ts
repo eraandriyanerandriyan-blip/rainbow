@@ -138,7 +138,7 @@ describe('pendingTransactionResolution', () => {
     ).rejects.toBe(error);
   });
 
-  it('keeps a confirmed managed transaction settled while relay exposes a late origin hash', async () => {
+  it('keeps a confirmed managed transaction settled while relay exposes a late source hash', async () => {
     mockGetStatus.mockResolvedValue(
       buildRelayStatus({
         status: RelayExecutionStatus.Pending,
@@ -519,8 +519,7 @@ function buildRelayStatus({
     updatedAtMs: 0,
     onchain: txHash
       ? {
-          scope: 'singlechain',
-          transactions: {
+          source: {
             chainId: 8453,
             hashes: [txHash],
             kind: 'evm',
