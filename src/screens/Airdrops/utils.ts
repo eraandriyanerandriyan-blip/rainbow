@@ -13,19 +13,19 @@ import { buildGasParams, weiToGwei } from '@/features/gas/utils/parseGas';
 import { type LedgerSigner } from '@/features/hardware-wallet/utils/LedgerSigner';
 import { useBackendNetworksStore } from '@/features/network/stores/backendNetworksStore';
 import { type ChainId } from '@/features/network/types/backendNetworks';
+import { loadWallet } from '@/features/wallet/data/loadWallet';
 import { lessThanOrEqualToWorklet } from '@/framework/core/safeMath';
 import { time } from '@/framework/core/utils/time';
 import { getProvider, toHex } from '@/handlers/web3';
 import { formatNumber, multiply } from '@/helpers/utilities';
 import { logger, RainbowError } from '@/logger';
-import { loadWallet } from '@/model/wallet';
 import Navigation from '@/navigation/Navigation';
 import Routes from '@/navigation/routesNames';
 import { type RainbowClaimable } from '@/resources/addys/claimables/types';
 import { isStaging } from '@/resources/addys/client';
 import { userAssetsStore } from '@/state/assets/userAssets';
 import { getNextNonce } from '@/state/nonces';
-import { addNewTransaction } from '@/state/pendingTransactions';
+import { addNewTransaction } from '@/state/pendingTransactions/addNewTransaction';
 import ethereumUtils from '@/utils/ethereumUtils';
 
 export interface GasInfo {

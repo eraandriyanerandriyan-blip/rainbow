@@ -28,6 +28,13 @@ export interface EthereumWalletFromSeed {
   walletType: WalletLibraryType;
 }
 
+export interface EthereumWalletFromMnemonic extends EthereumWalletFromSeed {
+  root: EthereumHDKey;
+  type: EthereumWalletType.mnemonic;
+  wallet: LibWallet;
+  walletType: WalletLibraryType.bip39;
+}
+
 export function identifyWalletType(walletSeed: EthereumWalletSeed): EthereumWalletType {
   if (isHexStringIgnorePrefix(walletSeed) && addHexPrefix(walletSeed).length === 66) {
     return EthereumWalletType.privateKey;

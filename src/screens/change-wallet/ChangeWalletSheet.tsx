@@ -18,6 +18,8 @@ import { Box, globalColors, HitSlop, Inline, Text } from '@/design-system';
 import type { EthereumAddress } from '@/entities/wallet';
 import { NOTIFICATIONS } from '@/features/config/constants/experimental';
 import { useExperimentalFlag } from '@/features/config/hooks/experimentalHooks';
+import { cleanUpWalletKeys } from '@/features/wallet/data/walletKeychain';
+import { type RainbowWallet } from '@/features/wallet/types';
 import { showActionSheetWithOptions } from '@/framework/ui/utils/actionsheet';
 import { opacity } from '@/framework/ui/utils/opacity';
 import { removeWalletData } from '@/handlers/localstorage/removeWallet';
@@ -29,7 +31,6 @@ import useWalletsWithBalancesAndNames from '@/hooks/useWalletsWithBalancesAndNam
 import { useWalletTransactionCounts } from '@/hooks/useWalletTransactionCounts';
 import * as i18n from '@/languages';
 import { logger, RainbowError } from '@/logger';
-import { cleanUpWalletKeys, type RainbowWallet } from '@/model/wallet';
 import { useNavigation } from '@/navigation/Navigation';
 import Routes from '@/navigation/routesNames';
 import { type RootStackParamList } from '@/navigation/types';
