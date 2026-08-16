@@ -42,7 +42,7 @@ import { useNftsStore } from '@/state/nfts/nfts';
 import { getNextNonce } from '@/state/nonces';
 import { addNewTransaction } from '@/state/pendingTransactions';
 import { executeFn, Screens, TimeToSignOperation } from '@/state/performance/performance';
-import { type CallInput, type PreparedCallsExecution } from '@rainbow-me/sdk';
+import { ManagedExecutionFailedError, type CallInput, type PreparedCallsExecution } from '@rainbow-me/sdk';
 
 import { executeSponsoredSend } from '../utils/sponsoredSend';
 import { executeSponsoredSendIfAvailable } from '../utils/sponsoredSendExecution';
@@ -279,7 +279,7 @@ export function useSendSubmit({
         return didSubmitPaidSend;
       } catch (error) {
         const message = ensureError(error).message;
-        if (isInsufficientSponsorBalanceError(message) || isSponsoredRelayExecutionFailure(message)) {
+        if (error instanceof ManagedExecutionFailedError || isInsufficientSponsorBalanceError(message)) {
           setSponsoredSendUnavailable({
             chainId: currentChainId,
             error,
@@ -456,10 +456,6 @@ function setSponsoredSendUnavailable({ chainId, error }: { chainId: ChainId; err
     error,
   });
   Alert.alert(i18n.t(i18n.l.wallet.transaction.alert.failed_transaction), i18n.t(i18n.l.send.sponsorship_unavailable));
-}
-
-function isSponsoredRelayExecutionFailure(message: string): boolean {
-  return message.includes('Managed relay execution failed') || message.includes('Managed relay execution reverted');
 }
 
 async function submitPaidSend({
