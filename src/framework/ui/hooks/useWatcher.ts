@@ -6,8 +6,8 @@ import { logger, RainbowError } from '@/logger';
 interface UseWatcherProps {
   /** Poll only while true; toggling it starts or stops the loop. */
   enabled?: boolean;
-  /** Delay between runs, in ms. */
-  interval?: number;
+  /** Delay between runs, in ms. Pass a function to recompute it per run — the loop keeps its schedule instead of restarting. */
+  interval?: number | (() => number);
   /** Asynchronous work to run on each polling cycle. */
   watchFunction: (abortController: AbortController) => Promise<void>;
 }
@@ -21,8 +21,9 @@ export function useWatcher({ enabled = true, interval = time.seconds(1), watchFu
   useEffect(() => {
     if (!enabled) return;
 
+    const delay = () => (typeof interval === 'function' ? interval() : interval);
     const abortController = new AbortController();
-    let nextDelay = interval;
+    let failureStreak = 0;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const run = async () => {
@@ -30,16 +31,16 @@ export function useWatcher({ enabled = true, interval = time.seconds(1), watchFu
 
       try {
         await watchFunction(abortController);
-        nextDelay = interval;
+        failureStreak = 0;
       } catch (error) {
         if (!abortController.signal.aborted) {
-          if (nextDelay === interval) logger.error(new RainbowError('[useWatcher]: watch failed', error));
-          nextDelay += interval;
+          if (failureStreak === 0) logger.error(new RainbowError('[useWatcher]: watch failed', error));
+          failureStreak += 1;
         }
       }
 
       if (!abortController.signal.aborted) {
-        timeoutId = setTimeout(run, nextDelay);
+        timeoutId = setTimeout(run, delay() * (failureStreak + 1));
       }
     };
 

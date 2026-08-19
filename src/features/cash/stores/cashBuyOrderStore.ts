@@ -3,10 +3,16 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { analytics } from '@/analytics';
 import { requireAddress } from '@/features/address/core/requireAddress';
+import { ResponseParseError } from '@/framework/data/http/parseResponse';
 import { logger, RainbowError } from '@/logger';
 import { pendingTransactionsActions } from '@/state/pendingTransactions';
 
-import { CASH_BUY_DESTINATION_ASSET } from '../constants';
+import {
+  CASH_BUY_DESTINATION_ASSET,
+  ORDER_FAST_POLL_DURATION_MS,
+  ORDER_FAST_POLL_INTERVAL_MS,
+  ORDER_SLOW_POLL_INTERVAL_MS,
+} from '../constants';
 import {
   createBuyOrder,
   getOrder,
@@ -189,8 +195,14 @@ export const useCashBuyOrderStore = createBaseStore<CashBuyOrderState>(
           }
         } catch (error) {
           if (abortController?.signal.aborted) return;
-          // Transient poll failure; retry on the watcher's next tick.
-          logger.error(new RainbowError('[cashBuyOrderStore] getOrder failed'), { error });
+          // Either way the order stays active and the watcher retries: dropping it would let the next submit
+          // create a second charge for one the backend may already have taken. An unreadable response gets its
+          // own message because it will not clear on its own the way a transient network failure does.
+          const message =
+            error instanceof ResponseParseError
+              ? '[cashBuyOrderStore] order response could not be read'
+              : '[cashBuyOrderStore] getOrder failed';
+          logger.error(new RainbowError(message), { error, orderId });
         } finally {
           abortController?.signal.removeEventListener('abort', propagateAbort);
         }
@@ -223,5 +235,15 @@ export const useCashBuyOrderStore = createBaseStore<CashBuyOrderState>(
 );
 
 export const cashBuyOrderActions = createStoreActions(useCashBuyOrderStore);
+
+/**
+ * Fast while a fresh order is most likely to settle, slow after that. Read on every poll rather than passed
+ * as a value, so changing cadence does not restart the loop and abort the request in flight.
+ */
+export function getOrderPollIntervalMs(): number {
+  const { status } = useCashBuyOrderStore.getState();
+  if (status.step !== 'polling') return ORDER_FAST_POLL_INTERVAL_MS;
+  return Date.now() - status.submittedAt >= ORDER_FAST_POLL_DURATION_MS ? ORDER_SLOW_POLL_INTERVAL_MS : ORDER_FAST_POLL_INTERVAL_MS;
+}
 
 export const useCashBuyPhase = () => useCashBuyOrderStore(selectCashBuyPhase);

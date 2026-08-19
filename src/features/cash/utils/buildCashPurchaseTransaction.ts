@@ -5,7 +5,7 @@ import { getUniqueId } from '@/utils/ethereumUtils';
 import getUrlForTrustIconFallback from '@/utils/getUrlForTrustIconFallback';
 
 import { CASH_USDC_BY_NETWORK, USDC_DECIMALS, USDC_NAME, USDC_SYMBOL } from '../constants';
-import { RampError, type BuyOrder, type OrderStatus } from '../services/rampClient';
+import type { BuyOrder, OrderStatus } from '../services/rampClient';
 
 type CompletedBuyOrder = Extract<BuyOrder, { status: OrderStatus.Completed }>;
 
@@ -20,7 +20,6 @@ export function buildCashPurchaseTransaction({
 
   const { network: rampNetwork } = order.cryptoAmount.asset;
   const usdc = CASH_USDC_BY_NETWORK[rampNetwork];
-  if (!usdc) throw new RampError(`Unsupported ramp network: ${rampNetwork}`);
 
   const { address, chainId, chainName: network } = usdc;
   const fiatSymbol = supportedCurrencies[order.fiatAmount.currency as keyof typeof supportedCurrencies]?.symbol ?? '';

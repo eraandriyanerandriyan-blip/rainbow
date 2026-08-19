@@ -11,13 +11,19 @@ import { HoldToActivateButton } from '@/components/hold-to-activate-button/HoldT
 import { NumberPad } from '@/components/number-pad/NumberPad';
 import { DEFAULT_HANDLE_COLOR_DARK, DEFAULT_HANDLE_COLOR_LIGHT, PanelSheet } from '@/components/PanelSheet/PanelSheet';
 import { Box, Inline, Text, useColorMode, useForegroundColor } from '@/design-system';
-import { ORDER_POLL_INTERVAL_MS } from '@/features/cash/constants';
 import { isPasskeyCancellation } from '@/features/cash/services/cashPasskeyService';
 import { checkWalletLink } from '@/features/cash/services/walletLinkService';
-import { cashBuyOrderActions, selectCashBuyPhase, useCashBuyOrderStore, useCashBuyPhase } from '@/features/cash/stores/cashBuyOrderStore';
+import {
+  cashBuyOrderActions,
+  getOrderPollIntervalMs,
+  selectCashBuyPhase,
+  useCashBuyOrderStore,
+  useCashBuyPhase,
+} from '@/features/cash/stores/cashBuyOrderStore';
 import { useCashLinkedCard, type LinkedCard } from '@/features/cash/stores/cashPaymentMethodStore';
 import { useRemoteConfig } from '@/features/config/stores/remoteConfig';
 import { ChainId } from '@/features/network/types/backendNetworks';
+import { useTimestampReached } from '@/framework/ui/hooks/useTimestampReached';
 import { useWatcher } from '@/framework/ui/hooks/useWatcher';
 import { opacity } from '@/framework/ui/utils/opacity';
 import { WrappedAlert as Alert } from '@/helpers/alert';
@@ -348,21 +354,7 @@ export const AddCashSheet = memo(function AddCashSheet() {
   // The pending view takes over only once the order has been in flight longer than the configured
   // delay; until then the hold-to-add button's processing state is the only affordance.
   const pendingViewAt = submittedAt !== null ? submittedAt + pendingViewDelayMs : null;
-  const [showPendingView, setShowPendingView] = useState(() => pendingViewAt !== null && Date.now() >= pendingViewAt);
-
-  useEffect(() => {
-    if (pendingViewAt === null) {
-      setShowPendingView(false);
-      return;
-    }
-    const remaining = pendingViewAt - Date.now();
-    if (remaining <= 0) {
-      setShowPendingView(true);
-      return;
-    }
-    const timeoutId = setTimeout(() => setShowPendingView(true), remaining);
-    return () => clearTimeout(timeoutId);
-  }, [pendingViewAt]);
+  const showPendingView = useTimestampReached(pendingViewAt);
 
   useEffect(() => {
     return () => {
@@ -382,7 +374,7 @@ export const AddCashSheet = memo(function AddCashSheet() {
 
   useWatcher({
     enabled: isPolling,
-    interval: ORDER_POLL_INTERVAL_MS,
+    interval: getOrderPollIntervalMs,
     watchFunction: cashBuyOrderActions.syncActiveOrder,
   });
 

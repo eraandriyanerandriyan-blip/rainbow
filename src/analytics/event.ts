@@ -6,7 +6,7 @@ import { type LearnCategory } from '@/components/cards/utils/types';
 import { type FiatProviderName } from '@/entities/f2c';
 import { type UnlockableAppIconKey } from '@/features/app-icon/models/appIcons';
 import { type CashSignInTrigger } from '@/features/cash/services/cashSignInService';
-import { type OrderFailureReason, type RampNetwork } from '@/features/cash/services/rampClient';
+import { type RampNetwork } from '@/features/cash/services/rampClient';
 import { type CandleResolution, type ChartType } from '@/features/charts/types';
 import { type FavoritedSite } from '@/features/dapp-browser/stores/favoriteDappsStore';
 import { type RequestSource } from '@/features/dapp-request/types';
@@ -550,7 +550,8 @@ export type EventProperties = {
   };
   [event.cashBuyOrderFailed]: {
     orderId: string;
-    failureReason: OrderFailureReason | null;
+    /** Raw wire reason, so one the backend adds ahead of the client is still recorded. Null when the create call itself failed. */
+    failureReason: string | null;
     errorCode: 'PAYMENT_REJECTED' | 'GENERIC';
   };
   [event.cashPhoneSubmitted]: {
