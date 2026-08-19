@@ -6,7 +6,10 @@ import { useAddPasskeyFlowStore } from './steps/useAddPasskeyFlow';
 import { useSubmitPhoneFlowStore } from './steps/useSubmitPhoneFlow';
 import { useSubmitReviewFlowStore } from './steps/useSubmitReviewFlow';
 
-/** True while any Setup submission is in flight; disables every back/cancel affordance. */
+/**
+ * True when any non-interruptible Setup action is running.
+ * KYC status checks are excluded as users may exit while review is pending.
+ */
 export const useIsSetupSubmittingStore = createDerivedStore<boolean>(
   $ => {
     const submittingPhone = $(useSubmitPhoneFlowStore, state => state.state === 'submitting');
