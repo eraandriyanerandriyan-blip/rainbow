@@ -71,8 +71,8 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
   setCode: code => set(({ state }) => ({ code, state: state === 'error' ? 'entry' : state })),
 
   submit: async () => {
-    const { code, state } = get();
-    if (code.length !== OTP_LENGTH || state === 'verifying' || state === 'submitted') return 'failed';
+    const { code, resending, state } = get();
+    if (code.length !== OTP_LENGTH || resending || state === 'verifying' || state === 'submitted') return 'failed';
     const sessionStore = useCashSetupSessionStore.getState();
     const { session } = sessionStore;
     if (session.status !== 'phoneSubmitted' && session.status !== 'recovery') return 'failed';
@@ -138,7 +138,8 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
   },
 
   resend: async () => {
-    if (get().resending !== null) return;
+    const { resending, state } = get();
+    if (resending || state === 'verifying' || state === 'submitted') return;
     const sessionStore = useCashSetupSessionStore.getState();
     const { session } = sessionStore;
     if ((session.status !== 'phoneSubmitted' && session.status !== 'recovery') || Date.now() < session.resendAfter) return;
@@ -148,6 +149,7 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
     try {
       if (challenge.kind === 'signup') {
         const { resendAfter } = await resendPhoneCode({ userId: challenge.userId });
+        if (!sessionStore.getIsCurrentChallenge(challenge)) return;
         sessionStore.setResendAfter(challenge, resendAfter);
       } else if (challenge.kind === 'resume') {
         // Resume has no resend endpoint; re-arming the OTP means a fresh
@@ -160,6 +162,7 @@ export const useVerifyPhoneFlowStore = createBaseStore<VerifyPhoneFlowStore>((se
         if (!sessionStore.getIsCurrentChallenge(challenge)) return;
         sessionStore.replaceRecoveryChallenge(challenge, { kind: 'recovery', recoveryId }, resendAfter);
       }
+      set({ code: '' });
     } catch (e) {
       if (!sessionStore.getIsCurrentChallenge(challenge)) return;
       logger.error(new RainbowError('[useVerifyPhoneFlow]: Failed to resend code', e));

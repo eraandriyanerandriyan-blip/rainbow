@@ -25,7 +25,7 @@ export const ConfirmPhoneStep = memo(function ConfirmPhoneStep() {
   return (
     <>
       <SetupStepLayout
-        actionDisabled={code.length !== OTP_LENGTH}
+        actionDisabled={code.length !== OTP_LENGTH || resending}
         actionLabel={i18n.t(l.confirm)}
         actionLoading={submitted}
         onAction={submit}
