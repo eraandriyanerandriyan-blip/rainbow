@@ -19,6 +19,10 @@ import { buildCashPurchaseTransaction } from '../utils/buildCashPurchaseTransact
 import { cashBuyOrderActions, selectCashBuyPhase, useCashBuyOrderStore, type CashBuyStatus } from './cashBuyOrderStore';
 import { useCashWalletStore } from './cashWalletStore';
 
+jest.mock('@/analytics/utils', () => ({
+  toAnalyticsAmount: jest.fn((value: string | number) => Number(value)),
+}));
+
 jest.mock('@/logger', () => ({
   logger: { debug: jest.fn(), error: jest.fn(), warn: jest.fn() },
   RainbowError: class RainbowError extends Error {},
