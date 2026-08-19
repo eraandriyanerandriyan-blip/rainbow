@@ -66,20 +66,21 @@ export const ReviewStep = memo(function ReviewStep() {
     if (result === 'recovered') CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_PASSKEY);
     if (result === 'phoneCodeRequired') CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_CONFIRM_PHONE);
   }, [submitReview]);
-  const editIdentity = useCallback(() => CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_IDENTITY), []);
-  const editSsn = useCallback(() => CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_SSN), []);
+
   const contactSupport = useCallback(() => {
     openInBrowser(RAINBOW_SUPPORT_URL);
     dismiss();
   }, [dismiss]);
+
   const continueAfterVerification = useCallback(() => {
     reset();
     next();
   }, [reset, next]);
+
   const editIdentityAfterFailure = useCallback(() => {
     reset();
     editIdentity();
-  }, [reset, editIdentity]);
+  }, [reset]);
 
   return (
     <>
@@ -155,3 +156,11 @@ export const ReviewStep = memo(function ReviewStep() {
     </>
   );
 });
+
+function editIdentity(): void {
+  CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_IDENTITY);
+}
+
+function editSsn(): void {
+  CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_SSN);
+}

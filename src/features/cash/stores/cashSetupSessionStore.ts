@@ -12,12 +12,14 @@ export type CashSetupIdentity = {
   dateOfBirth: CashSetupDateOfBirth;
 };
 
-export type RecoveryPhoneChallenge = Readonly<{ kind: 'recovery'; recoveryId: string }>;
-
-// Identifies one accepted phone submission by reference, so async results can
-// be checked against the submission that started them.
 export type PhoneVerificationChallenge = Readonly<{ kind: 'signup'; userId: string }> | Readonly<{ kind: 'resume'; resumeId: string }>;
 
+export type RecoveryPhoneChallenge = Readonly<{ kind: 'recovery'; recoveryId: string }>;
+
+/**
+ * Identifies an accepted phone submission by reference so async
+ * results can be checked against the submission that started them.
+ */
 export type PhoneChallenge = PhoneVerificationChallenge | RecoveryPhoneChallenge;
 
 export type CashSetupGovernmentIdKind = 'GOVERNMENT_ID_KIND_SSN_LAST4';
@@ -90,18 +92,19 @@ type CashSetupSessionStore = {
 
 const EMPTY_SESSION: EmptyCashSetupSession = { status: 'empty' };
 
-function hasIdentityDraft(session: CashSetupSession): session is RecoveryCashSetupSession | VerifiedCashSetupSession {
-  return session.status === 'recovery' || session.status === 'phoneVerified';
-}
-
-// Intentionally memory-only (PII)
+/**
+ * Memory-only store that manages registration state and PII for the Cash setup flow.
+ */
 export const useCashSetupSessionStore = createBaseStore<CashSetupSessionStore>((set, get) => ({
   session: EMPTY_SESSION,
+
   getIsCurrentChallenge: challenge => {
     const { session } = get();
     return (session.status === 'phoneSubmitted' || session.status === 'recovery') && session.challenge === challenge;
   },
+
   hasRecoverableSession: () => isSessionRecoverable(get().session),
+
   setPhoneSubmitted: ({ challenge, phoneNationalNumber, resendAfter }) =>
     set({
       session:
@@ -109,7 +112,9 @@ export const useCashSetupSessionStore = createBaseStore<CashSetupSessionStore>((
           ? { status: 'recovery', challenge, phoneNationalNumber, resendAfter, identity: null, governmentId: null }
           : { status: 'phoneSubmitted', challenge, phoneNationalNumber, resendAfter },
     }),
+
   setPhoneAlreadyRegistered: phoneNationalNumber => set({ session: { status: 'phoneAlreadyRegistered', phoneNationalNumber } }),
+
   setResendAfter: (challenge, resendAfter) =>
     set(state => {
       const { session } = state;
@@ -121,12 +126,14 @@ export const useCashSetupSessionStore = createBaseStore<CashSetupSessionStore>((
         return state;
       return { session: { ...session, resendAfter } };
     }),
+
   replaceRecoveryChallenge: (challenge, next, resendAfter) =>
     set(state => {
       const { session } = state;
       if (session.status !== 'recovery' || session.challenge !== challenge) return state;
       return { session: { ...session, challenge: next, resendAfter } };
     }),
+
   setPhoneVerified: (challenge, { bootstrapToken, expiresAt }) =>
     set(state => {
       const { session } = state;
@@ -143,16 +150,19 @@ export const useCashSetupSessionStore = createBaseStore<CashSetupSessionStore>((
         },
       };
     }),
-  setIdentity: identity => {
-    const { session } = get();
-    if (!hasIdentityDraft(session)) return;
-    set({ session: { ...session, identity } });
-  },
-  setGovernmentId: governmentId => {
-    const { session } = get();
-    if (!hasIdentityDraft(session)) return;
-    set({ session: { ...session, governmentId } });
-  },
+
+  setIdentity: identity =>
+    set(state => {
+      if (!hasIdentityDraft(state.session)) return state;
+      return { session: { ...state.session, identity } };
+    }),
+
+  setGovernmentId: governmentId =>
+    set(state => {
+      if (!hasIdentityDraft(state.session)) return state;
+      return { session: { ...state.session, governmentId } };
+    }),
+
   reset: () => set(state => (state.session === EMPTY_SESSION ? state : { session: EMPTY_SESSION })),
 }));
 
@@ -175,4 +185,8 @@ export function selectCashSetupGovernmentId(state: CashSetupSessionStore): CashS
 function isSessionRecoverable(session: CashSetupSession): boolean {
   if (session.status !== 'recovery') return false;
   return session.identity !== null && session.governmentId !== null;
+}
+
+function hasIdentityDraft(session: CashSetupSession): session is RecoveryCashSetupSession | VerifiedCashSetupSession {
+  return session.status === 'recovery' || session.status === 'phoneVerified';
 }
