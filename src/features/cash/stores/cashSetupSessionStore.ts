@@ -77,6 +77,7 @@ type CashSetupSession =
 type CashSetupSessionStore = {
   session: CashSetupSession;
   getIsCurrentChallenge: (challenge: PhoneChallenge) => boolean;
+  hasRecoverableSession: () => boolean;
   setPhoneSubmitted: (params: { challenge: PhoneChallenge; phoneNationalNumber: string; resendAfter: number }) => void;
   setPhoneAlreadyRegistered: (phoneNationalNumber: string) => void;
   setResendAfter: (challenge: PhoneChallenge, resendAfter: number) => void;
@@ -100,6 +101,7 @@ export const useCashSetupSessionStore = createBaseStore<CashSetupSessionStore>((
     const { session } = get();
     return (session.status === 'phoneSubmitted' || session.status === 'recovery') && session.challenge === challenge;
   },
+  hasRecoverableSession: () => isSessionRecoverable(get().session),
   setPhoneSubmitted: ({ challenge, phoneNationalNumber, resendAfter }) =>
     set({
       session:
@@ -168,4 +170,9 @@ export function selectCashSetupIdentity(state: CashSetupSessionStore): CashSetup
 
 export function selectCashSetupGovernmentId(state: CashSetupSessionStore): CashSetupGovernmentId | null {
   return hasIdentityDraft(state.session) ? state.session.governmentId : null;
+}
+
+function isSessionRecoverable(session: CashSetupSession): boolean {
+  if (session.status !== 'recovery') return false;
+  return session.identity !== null && session.governmentId !== null;
 }

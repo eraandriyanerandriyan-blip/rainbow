@@ -36,8 +36,7 @@ export function useVerifyPhoneFlow(): {
     const result = await verifyPhoneFlowActions.submit();
     if (result === 'verified') next();
     if (result === 'recoveryCodeAccepted') {
-      const { session } = useCashSetupSessionStore.getState();
-      if (session.status === 'recovery' && session.identity && session.governmentId) {
+      if (useCashSetupSessionStore.getState().hasRecoverableSession()) {
         CashDepositSetupNavigation.navigate(Routes.CASH_SETUP_REVIEW);
       } else {
         next();

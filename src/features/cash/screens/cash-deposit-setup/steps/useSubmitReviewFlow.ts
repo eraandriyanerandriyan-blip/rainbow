@@ -33,15 +33,12 @@ type SubmitReviewResult =
   | 'cancelled'
   | 'skipped';
 
-// After submission, every non-verdict status means the provider is still deciding.
-function isAwaitingDecision(status: KycStatus): boolean {
-  return status !== KycStatus.Approved && status !== KycStatus.Rejected;
-}
+type EmptyObject = Record<string, never>;
 
 type SubmitReviewFlowStore = {
   state: SubmitReviewState;
-  // Invalidates an onboarding poll when the screen resets this module-level store.
-  kycRun: object | null;
+  /** Empty identity object used to detect when this module-level store is reset. */
+  kycRun: EmptyObject | null;
   reset: () => void;
   submit: () => Promise<SubmitReviewResult>;
 };
@@ -54,7 +51,9 @@ export const useSubmitReviewFlowStore = createBaseStore<SubmitReviewFlowStore>((
 
   submit: async () => {
     const { state } = get();
-    if (state === 'submitting' || state === 'reviewing' || state === 'locked') return 'skipped';
+    if (state === 'submitting' || state === 'reviewing' || state === 'locked') {
+      return 'skipped';
+    }
 
     const sessionStore = useCashSetupSessionStore.getState();
     const { session } = sessionStore;
@@ -71,43 +70,49 @@ export const useSubmitReviewFlowStore = createBaseStore<SubmitReviewFlowStore>((
         const result = await finishRecovery({ recoveryId: challenge.recoveryId, code, identity, governmentId });
         if (isStale()) return 'cancelled';
 
-        if (result.outcome === 'recovered') {
-          sessionStore.setPhoneVerified(challenge, result);
-          analytics.track(analytics.event.cashPhoneVerified, { mode: 'recovery' });
-          set({ state: 'entry' });
-          return 'recovered';
-        }
+        switch (result.outcome) {
+          case 'recovered': {
+            sessionStore.setPhoneVerified(challenge, result);
+            analytics.track(analytics.event.cashPhoneVerified, { mode: 'recovery' });
+            set({ state: 'entry' });
+            return 'recovered';
+          }
 
-        if (result.outcome === 'identityMismatch') {
-          set({ state: 'error' });
-          return 'failed';
-        }
+          case 'identityMismatch': {
+            set({ state: 'error' });
+            return 'failed';
+          }
 
-        if (result.outcome === 'codeInvalid') {
-          useVerifyPhoneFlowStore.getState().rejectCode();
-          analytics.track(analytics.event.cashPhoneVerifyFailed, { mode: 'recovery', reason: 'invalidCode' });
-          set({ state: 'entry' });
-          return 'phoneCodeRequired';
-        }
+          case 'codeInvalid': {
+            useVerifyPhoneFlowStore.getState().rejectCode();
+            analytics.track(analytics.event.cashPhoneVerifyFailed, { mode: 'recovery', reason: 'invalidCode' });
+            set({ state: 'entry' });
+            return 'phoneCodeRequired';
+          }
 
-        if (result.outcome === 'accessBlocked') {
-          set({ state: 'locked' });
-          return 'failed';
-        }
+          case 'accessBlocked': {
+            set({ state: 'locked' });
+            return 'failed';
+          }
 
-        if (result.outcome === 'sessionInvalid') {
-          const { recoveryId, resendAfter } = await startRecovery({ nationalNumber: phoneNationalNumber });
-          if (isStale()) return 'cancelled';
-          sessionStore.replaceRecoveryChallenge(challenge, { kind: 'recovery', recoveryId }, resendAfter);
-        } else {
-          const { resumeId, resendAfter } = await startSignupResume({ nationalNumber: phoneNationalNumber });
-          if (isStale()) return 'cancelled';
-          sessionStore.setPhoneSubmitted({
-            challenge: { kind: 'resume', resumeId },
-            phoneNationalNumber,
-            resendAfter,
-          });
-          analytics.track(analytics.event.cashPhoneSubmitted, { mode: 'resume' });
+          case 'sessionInvalid': {
+            const { recoveryId, resendAfter } = await startRecovery({ nationalNumber: phoneNationalNumber });
+            if (isStale()) return 'cancelled';
+            sessionStore.replaceRecoveryChallenge(challenge, { kind: 'recovery', recoveryId }, resendAfter);
+            break;
+          }
+
+          case 'signupIncomplete': {
+            const { resumeId, resendAfter } = await startSignupResume({ nationalNumber: phoneNationalNumber });
+            if (isStale()) return 'cancelled';
+            sessionStore.setPhoneSubmitted({
+              challenge: { kind: 'resume', resumeId },
+              phoneNationalNumber,
+              resendAfter,
+            });
+            analytics.track(analytics.event.cashPhoneSubmitted, { mode: 'resume' });
+            break;
+          }
         }
 
         useVerifyPhoneFlowStore.getState().reset();
@@ -189,4 +194,11 @@ export function useSubmitReviewFlow(): {
   const state = useSubmitReviewFlowStore(state => state.state);
 
   return { reset: submitReviewFlowActions.reset, state, submit: submitReviewFlowActions.submit };
+}
+
+/**
+ * Following submission, a non-terminal status indicates the provider is still deciding.
+ */
+function isAwaitingDecision(status: KycStatus): boolean {
+  return status !== KycStatus.Approved && status !== KycStatus.Rejected;
 }
