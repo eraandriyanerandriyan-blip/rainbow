@@ -20,7 +20,7 @@ import { cashBuyOrderActions, selectCashBuyPhase, useCashBuyOrderStore, type Cas
 import { useCashWalletStore } from './cashWalletStore';
 
 jest.mock('@/analytics/utils', () => ({
-  toAnalyticsAmount: jest.fn((value: string | number) => Number(value)),
+  toAnalyticsAmount: jest.fn((value: string | number) => { const n = Number(value); return Number.isFinite(n) ? Number(n.toPrecision(3)) : undefined; }),
 }));
 
 jest.mock('@/logger', () => ({
