@@ -8,7 +8,7 @@ export function getTelemetryErrorReason(error: unknown): TelemetryErrorReason {
     if (status !== undefined && status >= 500) return 'server_error';
     if (status !== undefined && status >= 400) return 'client_error';
     // rainbowFetch wraps network failures in a response-less RainbowFetchError, preserving the message.
-    if (status === undefined && error.message === 'Network request failed') return 'offline';
+    if (error.response === undefined) return 'offline';
     return 'unknown';
   }
   if (error instanceof TypeError && error.message === 'Network request failed') return 'offline';

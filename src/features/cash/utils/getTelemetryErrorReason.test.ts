@@ -12,7 +12,7 @@ describe('getTelemetryErrorReason', () => {
     { name: 'fetch error with 503', input: fetchError(503), expected: 'server_error' },
     { name: 'fetch error with 400', input: fetchError(400), expected: 'client_error' },
     { name: 'fetch error with 404', input: fetchError(404), expected: 'client_error' },
-    { name: 'fetch error without a response', input: fetchError(), expected: 'unknown' },
+    { name: 'fetch error without a response', input: fetchError(), expected: 'offline' },
     { name: 'wrapped network failure without a response', input: fetchError(undefined, 'Network request failed'), expected: 'offline' },
     { name: 'whatwg-fetch offline error', input: new TypeError('Network request failed'), expected: 'offline' },
     { name: 'other TypeError', input: new TypeError('undefined is not a function'), expected: 'unknown' },
